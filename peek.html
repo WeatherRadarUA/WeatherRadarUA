@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="uk"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Перевірка index.html</title>
+<style>
+ body{font-family:system-ui,Arial,sans-serif;background:#0a0e1f;color:#eef2ff;margin:0;padding:14px;line-height:1.5}
+ h1{font-size:17px;margin:0 0 8px}
+ .r{background:#111634;border:1px solid #23305c;border-radius:12px;padding:10px;margin:8px 0;font-size:13px;word-break:break-word;white-space:pre-wrap}
+ .ok{color:#34d399;font-weight:700}.bad{color:#fb7185;font-weight:700}.warn{color:#fbbf24;font-weight:700}
+ button{background:#22d3ee;color:#06121f;border:0;border-radius:12px;padding:12px 16px;font-weight:800;font-size:14px;margin:8px 6px 8px 0;cursor:pointer}
+ small{color:#9aa6c7}
+</style></head><body>
+<h1>🔬 Перевірка твого index.html</h1>
+<small>Цей файл НЕ змінює сайт. Він лише читає index.html і шукає помилку. Коли закінчить — натисни кнопки копіювати і встав мені в чат текстом.</small>
+<div id="log"></div>
+<button id="c1" style="display:none">📋 Скопіювати звіт</button>
+<button id="c2" style="display:none">📋 Скопіювати весь JS із index.html</button>
+<script>
+const log=document.getElementById("log");
+let report="", jsAll="";
+function add(h){const d=document.createElement("div");d.className="r";d.innerHTML=h;log.appendChild(d);}
+function rep(t){report+=t.replace(/<[^>]+>/g,"")+"\n";}
+function esc(t){return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+(async()=>{
+ let html;
+ try{
+   const r=await fetch("index.html",{cache:"no-store"});
+   html=await r.text();
+ }catch(e){ add('<span class="bad">❌ Не вдалось прочитати index.html: '+esc(e.message)+'</span>'); return; }
+
+ const len=html.length;
+ const trimmed=html.trim();
+ const endsOk=trimmed.endsWith("</html>");
+ add('📄 Розмір index.html: <b>'+len+'</b> символів. Закінчується на &lt;/html&gt;: '+(endsOk?'<span class="ok">ТАК</span>':'<span class="bad">НІ (файл обрізаний!)</span>'));
+ rep('Розмір index.html: '+len+' символів. Закінчується на </html>: '+(endsOk?'ТАК':'НІ (обрізаний)'));
+ rep('Останні 60 символів: '+JSON.stringify(trimmed.slice(-60)));
+
+ const tgCount=(html.match(/const TG =/g)||[]).length;
+ const selCount=(html.match(/function selectPlace/g)||[]).length;
+ const doctypeCount=(html.match(/<!doctype/gi)||[]).length;
+ const headCount=(html.match(/<head>/gi)||[]).length;
+ add('🔢 Подвоєння коду? const TG = зустрічається <b>'+tgCount+'</b> раз(и); function selectPlace — <b>'+selCount+'</b>; &lt;!doctype&gt; — <b>'+doctypeCount+'</b>; &lt;head&gt; — <b>'+headCount+'</b>. '+( (tgCount>1||selCount>1||doctypeCount>1||headCount>1)?'<span class="bad">⚠ ФАЙЛ ПОДВОЄНИЙ — старий код не стерто перед вставкою нового!</span>':'<span class="ok">подвоєння не видно</span>'));
+ rep('const TG = разів: '+tgCount+' | function selectPlace разів: '+selCount+' | <!doctype> разів: '+doctypeCount+' | <head> разів: '+headCount);
+
+ const inlineRe=/<script>([\s\S]*?)<\/script>/g;
+ const blocks=[]; let m;
+ while((m=inlineRe.exec(html))!==null){ blocks.push(m[1]); }
+ add('🧩 Inline-скриптів (без src) знайдено: <b>'+blocks.length+'</b> (має бути 1).');
+ rep('Inline-скриптів без src: '+blocks.length+' (має бути 1)');
+
+ jsAll=blocks.join("\n;\n");
+
+ blocks.forEach((code,i)=>{
+   const head=code.trim().slice(0,70).replace(/\n/g," ");
+   const tail=code.trim().slice(-70).replace(/\n/g," ");
+   let status;
+   try{ new Function(code); status='<span class="ok">✅ синтаксис ОК</span>'; }
+   catch(e){ status='<span class="bad">❌ ПОМИЛКА: '+esc(e.message)+'</span>'; }
+   add('Блок #'+(i+1)+' ('+code.length+' символів): '+status+'<br><small>початок: '+esc(head)+' …<br>кінець: … '+esc(tail)+'</small>');
+   rep('Блок #'+(i+1)+' ('+code.length+' симб): '+status.replace(/<[^>]+>/g,"")+' | початок: '+head+' | кінець: '+tail);
+ });
+
+ let mergedStatus;
+ try{ new Function(jsAll); mergedStatus='<span class="ok">✅ весь JS компілюється</span>'; }
+ catch(e){ mergedStatus='<span class="bad">❌ ЗАГАЛЬНА ПОМИЛКА: '+esc(e.message)+'</span>'; }
+ add('🔗 Якщо злити всі блоки разом: '+mergedStatus);
+ rep('Злитий JS: '+mergedStatus.replace(/<[^>]+>/g,""));
+
+ add('<b>✅ Готово.</b> Натисни обидві кнопки «Скопіювати» і встав мені в чат <b>текстом</b> (спочатку звіт, потім JS — або як вийде).');
+ rep('--- ГОТОВО ---');
+
+ document.getElementById("c1").style.display="inline-block";
+ document.getElementById("c2").style.display="inline-block";
+ document.getElementById("c1").onclick=async()=>{ try{await navigator.clipboard.writeText(report);}catch(e){} document.getElementById("c1").textContent="✅ Звіт скопійовано"; };
+ document.getElementById("c2").onclick=async()=>{ try{await navigator.clipboard.writeText(jsAll);}catch(e){} document.getElementById("c2").textContent="✅ JS скопійовано"; };
+})();
+</script></body></html>
