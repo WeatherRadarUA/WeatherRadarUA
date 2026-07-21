@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="uk"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Діагностика 400</title>
+<style>
+ body{font-family:system-ui,Arial,sans-serif;background:#0a0e1f;color:#eef2ff;margin:0;padding:14px;line-height:1.5}
+ h1{font-size:17px;margin:0 0 8px}
+ .r{background:#111634;border:1px solid #23305c;border-radius:12px;padding:10px;margin:8px 0;font-size:13px;word-break:break-word;white-space:pre-wrap}
+ .ok{color:#34d399;font-weight:700}.bad{color:#fb7185;font-weight:700}.wait{color:#9aa6c7}
+ button{background:#22d3ee;color:#06121f;border:0;border-radius:12px;padding:12px 18px;font-weight:800;font-size:15px;margin:10px 0;cursor:pointer}
+ textarea{width:100%;height:220px;background:#0c1430;color:#cfe6ef;border:1px solid #23305c;border-radius:12px;padding:10px;font-size:12px;font-family:monospace}
+ small{color:#9aa6c7}
+</style></head><body>
+<h1>🔍 Діагностика запиту погоди</h1>
+<small>Цей файл НЕ чіпає твій сайт. Він лише перевіряє сервер. Коли закінчить — натисни кнопку і встав результат мені в чат текстом.</small>
+<div id="log"></div>
+<button id="copyBtn" style="display:none">📋 Скопіювати результат</button>
+<textarea id="out" readonly style="display:none"></textarea>
+<script>
+const BASE="https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.52&timezone=auto";
+const BASE2="https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.52";
+const CUR="&current=temperature_2m,weather_code";
+const DAILY_FULL="&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,sunrise,sunset,daylight_duration,sunshine_duration,uv_index_max,moonrise,moonset,moon_phase";
+const HOURLY_FULL="&hourly=temperature_2m,apparent_temperature,weather_code,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,uv_index,relative_humidity_2m";
+const combos=[
+ ["1 ТІЛЬКИ current (контроль)", BASE+CUR],
+ ["2 +daily мінімум", BASE+CUR+"&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=7"],
+ ["3 +daily ПОВНИЙ (з moon)", BASE+CUR+DAILY_FULL+"&forecast_days=14"],
+ ["4 +hourly мінімум", BASE+CUR+"&hourly=temperature_2m,weather_code&forecast_days=7"],
+ ["5 +hourly ПОВНИЙ (з uv)", BASE+CUR+HOURLY_FULL+"&forecast_days=14"],
+ ["6 ПОВНИЙ (current+hourly+daily, 14 днів)", BASE+CUR+HOURLY_FULL+DAILY_FULL+"&forecast_days=14"],
+ ["7 ПОВНИЙ БЕЗ timezone=auto", BASE2+CUR+HOURLY_FULL+DAILY_FULL+"&forecast_days=14"],
+ ["8 ПОВНИЙ 7 днів", BASE+CUR+HOURLY_FULL+DAILY_FULL+"&forecast_days=7"]
+];
+const log=document.getElementById("log"), out=document.getElementById("out");
+let report="";
+function add(t){ const d=document.createElement("div"); d.className="r"; d.innerHTML=t; log.appendChild(d); }
+function rep(t){ report+=t.replace(/<[^>]+>/g,"")+"\n"; }
+async function one(label,url){
+ add(`<span class="wait">⏳ ${label}</span>`);
+ const t0=performance.now();
+ try{
+   const r=await fetch(url,{cache:"no-store"});
+   const ms=Math.round(performance.now()-t0);
+   const txt=await r.text();
+   if(r.ok){
+     const line=`<span class="ok">✅ ${label}</span> — OK, ${ms}мс, ${txt.length} байт`;
+     add(line); rep("✅ "+label+" — OK, "+ms+"мс, "+txt.length+" байт");
+   }else{
+     const line=`<span class="bad">❌ ${label}</span> — HTTP ${r.status} (${ms}мс)\nСервер відповів: ${txt.slice(0,300).replace(/</g,"&lt;")}`;
+     add(line); rep("❌ "+label+" — HTTP "+r.status+" ("+ms+"мс)\nСервер: "+txt.slice(0,300));
+   }
+ }catch(e){
+   const ms=Math.round(performance.now()-t0);
+   const line=`<span class="bad">❌ ${label}</span> — ${e.name}: ${e.message} (${ms}мс)`;
+   add(line); rep("❌ "+label+" — "+e.name+": "+e.message+" ("+ms+"мс)");
+ }
+}
+(async()=>{
+ const head="online="+navigator.onLine+" | "+location.href+"\nUA="+(navigator.userAgent.match(/(Chrome|CriOS|Brave|Edg|Firefox|Safari)\/[\d.]+/)||["?"])[0]+"\n---";
+ add("<small>"+head.replace(/\n/g,"<br>")+"</small>"); rep(head);
+ for(const [l,u] of combos){ await one(l,u); }
+ rep("---\nГОТОВО. Натисни кнопку і встав цей текст у чат.");
+ add("<b>✅ Готово.</b> Тепер натисни кнопку «Скопіювати результат» і встав мені в чат <b>текстом</b> (не скріншотом).");
+ out.style.display="block"; out.value=report;
+ document.getElementById("copyBtn").style.display="inline-block";
+})();
+document.getElementById("copyBtn").onclick=async()=>{
+ out.select();
+ try{ await navigator.clipboard.writeText(report); document.getElementById("copyBtn").textContent="✅ Скопійовано! Встав у чат."; }
+ catch(e){ document.execCommand("copy"); document.getElementById("copyBtn").textContent="✅ Скопійовано! Встав у чат."; }
+};
+</script></body></html>
